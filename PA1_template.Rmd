@@ -12,6 +12,8 @@ output:
 activity = read.csv('activity.csv')
 str(activity)
 ```
+
+#### Overview
 ```{r}
 summary(activity)
 ```
@@ -24,6 +26,16 @@ head(activity)
 tail(activity)
 ```
 
+#### Interval ID pattern
+
+If we look at interval ID, we can find pattern how ID depends on time of the day in 24 hour format.
+```{r}
+unique(activity$interval)
+```
+
+For example, 0 - is 5 minutes intrval from 00:00 to 00:05.  
+2355 - is the last 5 minutes interval from 23:55 to 00:00 next day.
+
 
 ## What is mean total number of steps taken per day?
 
@@ -35,6 +47,8 @@ hist(dailySteps$steps, xlab="steps",ylab="Frequency",
      main="Steps per day distribution",border='orange',col="gray50")
 abline(v = theMean, col = "blue", lwd = 5)
 abline(v = theMedian, col = "red", lwd = 2)
+legend(19000, 25, c('mean','median'), lwd=4, col=c("blue", "red"))
+
 ```
 
 
@@ -42,17 +56,19 @@ abline(v = theMedian, col = "red", lwd = 2)
 summary(dailySteps)
 ```
 
-So Mean is `r theMean` and Median is `r theMedian`
+So Mean is **`r format(theMean, digits=2, nsmall=2)`** and Median is **`r theMedian`**
 
 
 ## What is the average daily activity pattern?
+
+#### What is average number of steps taken, averaged across all days?
 
 ```{r}
 fiveMinSteps <- aggregate(steps ~ interval, data = activity, FUN=mean, na.rm=T)
 plot(steps~interval,data=fiveMinSteps,type="l")
 ```
 
-#Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+#### Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
 ```{r}
 maxInterval <- fiveMinSteps[which.max(fiveMinSteps$steps),]
 maxInterval
@@ -60,8 +76,86 @@ maxInterval
 
 **`r maxInterval$interval`'s**  5-minute interval, on average across all the days in the dataset, contains the maximum number of steps. And steps values is **`r maxInterval$steps`**
 
+Which means that maximum average activity was **at 08:35 - 08:40 in the morning**.
+
 ## Imputing missing values
 
+####  Calculate total number of NA's 
+
+There are several ways to do it:
+
+  * summary function 
+```{r}
+  summary(activity)
+```
+  * sum function
+```{r}
+  sum(is.na(activity$steps))
+```
+In both cases Total NA's number is 2304.
+
+
+####  Create new Dataset with NA's filled in.
+
+```{r}
+df <- activity
+df$steps[is.na(df$steps)] <- aggregate(steps ~ interval, data = df, FUN=mean,na.rm=T)$steps
+summary(df)
+```
+
+There is no NA's compared to initial dataset and max value is Daily mean.
+
+Initial dataset:
+```{r}
+summary(activity)
+```
+
+
+####  Build new histogram and compare with initial
+```{r}
+dailyStepsNoNA <- aggregate(steps ~ date, data = df, FUN=sum,na.rm=T)
+theMeanNoNA <- mean(dailyStepsNoNA$steps,na.rm=T)
+theMedianNoNA <- median(dailyStepsNoNA$steps,na.rm=T)
+hist(dailyStepsNoNA$steps, xlab="steps",ylab="Frequency",
+     main="Steps per day distribution for No NA Dataset",border='green',col="grey80")
+
+abline(v = theMeanNoNA, col = "blue", lwd = 5)
+abline(v = theMedianNoNA, col = "red", lwd = 2)
+legend(19000, 35, c('mean','median'), lwd=4, col=c("blue", "red"))
+```
+
+
+#### Do these values differ from the estimates from the first part of the assignment? 
+```{r}
+summary(dailyStepsNoNA)
+```
+
+#### What is the impact of imputing missing data on the estimates of the total daily number of steps?
+
+Number of days with mean steps increased upto 35.
+
+Mean is **`r format(theMeanNoNA, digits=2, nsmall=2)`** and Median is **`r format(theMedianNoNA, digits=2, nsmall=2)`**. So they became equal.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
+
+#### Add new factor to dataset
+
+factor wd - lables if day is weekday or weekend
+
+```{r}
+df$dayType <- factor((weekdays(as.Date(df$date)) %in% c('Saturday','Sunday')), levels=c(TRUE,FALSE), labels=c('weekend', 'weekday'))
+df$weekday <- weekdays(as.Date(df$date))
+head(df)
+```
+
+#### Plot time series 
+```{r}
+fiveMinStepsWd <- aggregate(steps ~ interval + dayType, data = df, FUN=mean, na.rm=T)
+library(ggplot2)
+ggplot(fiveMinStepsWd, aes(interval, steps)) + 
+        geom_line(color="blue")+ 
+        facet_grid(dayType ~ .) +
+        xlab("5-minute interval") + 
+        ylab("avarage number of steps")
+```
